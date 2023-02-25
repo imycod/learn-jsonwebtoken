@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="../../../../studio/think-map-words-backend/routes/user.js"></script>
+</head>
+
+<body>
+<div id="root">
+    {{msg}}
+    <hr>
+    user<input type="text" v-model="form.username">
+    password<input type="text" v-model="form.password">
+    email<input type="text" v-model="form.email">
+    <button @click="createUser">createUser</button>
+    <hr>
+    <button @click="login">login</button>
+    <hr>
+    <button @click="logout">logout</button>
+    <hr>
+    <button @click="test1">test1 不携带token</button>
+    <hr>
+    <button @click="test2">test2 携带token</button>
+</div>
+<script src="https://cdn.bootcdn.net/ajax/libs/vue/3.2.47/vue.global.prod.min.js"></script>
+<script>
+    const {createApp, reactive} = Vue
+    const TokenUtils = {
+        set(value) {
+            sessionStorage.setItem('token', JSON.stringify({value: value, startTime : Date.now()}))
+        },
+        get() {
+            const currentTime= Date.now();
+            const obj=JSON.parse(sessionStorage.getItem('token'))
+            // 当用户直接点了退出,清空session token所以拿到的自然没有startTime
+            if (obj){
+                const diff =currentTime- obj.startTime
+                const hours = diff / (1000 * 60 * 60);
+                if (hours > 1) { // 对应后端token时长为1h过期,当过期时,我们这个session token也会清空
+                    this.remove()
+                    return ''
+                }else{
+                    return obj.value
+                }
+            }
+        },
+        remove() {
+            sessionStorage.removeItem('token')
+        }
+    }
+
+    const App = {
+        setup() {
+            const form = reactive({
+                username: '',
+                password: '',
+                email: '',
+            })
+
+            async function createUser() {
+                const res = await fetch('http://localhost:8080/users/registry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(form)
+                }).then(res => res.json())
+                console.log('res---->createUser', res)
+            }
+
+            async function login() {
+                const res = await fetch('http://localhost:8080/users/login', {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    method: 'POST',
+                    body: JSON.stringify(form)
+                }).then(res => res.json())
+                if (res.status === 200) {
+                    TokenUtils.set(res.token)
+                }
+            }
+
+            async function logout() {
+                // const res = await fetch('http://localhost:8080/users/logout').then(res => res.json())
+                TokenUtils.remove()
+            }
+
+            async function test1() {
+                try {
+                    const res = await fetch('http://localhost:8080/test').then(res => res.json())
+                    console.log('test1---->', res)
+                } catch (e) {
+                    console.log(e)
+                }
+            }
+
+            async function test2() {
+                try {
+                    const token = TokenUtils.get()
+                    const res = await fetch('http://localhost:8080/test', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json', //后端返回的类型
+                        },
+                    }).then(res => res.json())
+                    console.log('test1---->', res)
+                } catch (e) {
+                    console.log(e)
+                }
+            }
+
+
+            return {
+                form,
+                createUser,
+                login,
+                logout,
+                msg: '11',
+                test1,
+                test2,
+            }
+        }
+    }
+    const app = createApp(App)
+    app.mount('#root')
+</script>
+</body>
+
+</html>
